@@ -1,0 +1,183 @@
+esphome:
+  name: "gate"
+  friendly_name: "Centurion D5 Evo"
+  comment: "Control your Centurion D5 Evo gate motor remotely."
+
+esp8266:
+  board: sonoff_sv
+  restore_from_flash: True
+
+preferences:
+  flash_write_interval: 1min
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: "85390b248ca956197113120477c2e1f4"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none  # Reduces disconnects
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Gate Fallback Hotspot"
+    password: !secret fallback_password
+
+captive_portal:
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Gate Button"
+
+  - platform: gpio
+    pin:
+      number: GPIO14
+      mode:
+        input: true
+        pullup: true
+    name: "Gate Status Signal"
+    filters:
+      - delayed_on_off: 50ms  # Debounce to filter noise
+    on_multi_click:
+      - timing:  # Closed (OFF for at least 2000ms)
+          - OFF for at least 2000ms
+        then:
+          - logger.log: "Gate is Closed"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "Closed"
+        invalid_cooldown: 100ms
+
+      - timing:  # Partially or Fully Open (ON for at least 2000ms)
+          - ON for at least 2000ms
+        then:
+          - logger.log: "Gate is Open"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "Open"
+        invalid_cooldown: 100ms
+
+      - timing:  # Opening (Continuous slow flash, ~0.5Hz, 1000ms ON, 1000ms OFF)
+          - ON for 800ms to 1200ms
+          - OFF for 800ms to 1200ms
+          - ON for 800ms to 1200ms
+          - OFF for 800ms to 1200ms
+        then:
+          - logger.log: "Gate is Opening"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "Opening"
+        invalid_cooldown: 100ms
+
+      - timing:  # Closing (Continuous fast flash, ~2Hz, 250ms ON, 250ms OFF)
+          - ON for 200ms to 300ms
+          - OFF for 200ms to 300ms
+          - ON for 200ms to 300ms
+          - OFF for 200ms to 300ms
+        then:
+          - logger.log: "Gate is Closing"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "Closing"
+        invalid_cooldown: 100ms
+
+      - timing:  # Courtesy (Pillar) Lights On (One flash every 2s, 200ms ON, 1800ms OFF)
+          - ON for 150ms to 250ms
+          - OFF for 1700ms to 1900ms
+        then:
+          - logger.log: "Pillar Lights On"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "Pillar Lights On"
+        invalid_cooldown: 100ms
+
+      - timing:  # No Mains (Two flashes every 2s, 200ms ON, 200ms OFF, 200ms ON, 1200ms OFF)
+          - ON for 150ms to 250ms
+          - OFF for 150ms to 250ms
+          - ON for 150ms to 250ms
+          - OFF for 1100ms to 1300ms
+        then:
+          - logger.log: "No Mains"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "No Mains"
+        invalid_cooldown: 100ms
+
+      - timing:  # Battery Voltage Low (Three flashes every 2s, 200ms ON, 200ms OFF, repeat 3x, 1000ms OFF)
+          - ON for 150ms to 250ms
+          - OFF for 150ms to 250ms
+          - ON for 150ms to 250ms
+          - OFF for 150ms to 250ms
+          - ON for 150ms to 250ms
+          - OFF for 900ms to 1100ms
+        then:
+          - logger.log: "Battery Voltage Low"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "Battery Low"
+        invalid_cooldown: 100ms
+
+      - timing:  # Multiple Collisions (Four flashes every 2s, 200ms ON, 200ms OFF, repeat 4x, 800ms OFF)
+          - ON for 150ms to 250ms
+          - OFF for 150ms to 250ms
+          - ON for 150ms to 250ms
+          - OFF for 150ms to 250ms
+          - ON for 150ms to 250ms
+          - OFF for 150ms to 250ms
+          - ON for 150ms to 250ms
+          - OFF for 700ms to 900ms
+        then:
+          - logger.log: "Multiple Collisions"
+          - text_sensor.template.publish:
+              id: gate_status
+              state: "Multiple Collisions"
+        invalid_cooldown: 100ms
+
+switch:
+  - platform: gpio
+    name: "Gate"
+    icon: "mdi:gate"
+    pin: GPIO12
+    id: relay
+    on_turn_on:
+      - delay: 500ms
+      - switch.turn_off: relay
+
+text_sensor:
+  - platform: template
+    id: gate_status
+    name: "Gate Status"
+    icon: "mdi:gate"
+
+sensor:
+  # Wifi signal sensors
+  - platform: wifi_signal
+    name: "WiFi signal dB"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+
+  - platform: copy
+    source_id: wifi_signal_db
+    device_class: ""
+    name: "WiFi signal"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
