@@ -1,6 +1,6 @@
 # ESPHome Configuration for Centurion D5 Evo Gate Motor with Sonoff SV
 
-This ESPHome configuration enables remote control and status monitoring of a Centurion D5 Evo gate motor using a Sonoff SV (ESP8266). It integrates with Home Assistant to provide real-time gate status and control.
+This ESPHome configuration enables remote control and status monitoring of a Centurion D5 Evo gate motor using a Sonoff SV (ESP8266). It integrates with Home Assistant to provide real-time gate status and control. This code is based on the code of wernerhp/esphome.centurion_d5_evo.
 
 ## Features
 
@@ -15,7 +15,8 @@ This ESPHome configuration enables remote control and status monitoring of a Cen
 - Sonoff SV (ESP8266-based device)
 - Centurion D5 Evo gate motor
 - ESPHome (installed and configured with Home Assistant)
-- Voltage divider (e.g., 2kΩ and 3kΩ resistors) for 5V to 3.3V conversion
+- Voltage divider (e.g., 2.2kΩ and 3.3kΩ resistors) for 5V to 3.3V conversion
+- Low pass filter (e.g., 2.2µf and 10µf electrolytic capacitors) for a cutoff frequency of 40Hz
 - Basic soldering tools and jumper wires
 
 ## Hardware Setup
@@ -30,14 +31,15 @@ This ESPHome configuration enables remote control and status monitoring of a Cen
    - Wire a physical push button to GPIO0 and GND on the Sonoff SV.
    - GPIO0 is configured with an internal pull-up resistor.
 
-3. **Status Signal (GPIO14)**:
+3. **Status Signal (GPIO5)**:
 
    - The Centurion D5 Evo’s status output is 5V. Use a voltage divider to step it down to \~3V for the ESP8266:
-     - Connect the status output’s positive wire to a 2kΩ resistor.
-     - Connect the other end of the 2kΩ resistor to GPIO14 and a 3kΩ resistor.
-     - Connect the other end of the 3kΩ resistor to GND.
+     - Connect the status output’s positive wire to a 2.2kΩ resistor.
+     - Connect the other end of the 2kΩ resistor to GPIO5 and a 3.3kΩ resistor.
+     - Connect the other end of the 3.3kΩ resistor to GND.
      - Connect the status output’s negative wire to the Sonoff SV’s GND.
-   - Example: `[Status Output +] --[2kΩ]--[GPIO14]--[3kΩ]--[GND]`
+     - Connect a 2.2µf as well as a 10µf electrolytic capacitor in parallel with the 3.3kΩ resistor to create a 40Hz low pass filter.
+   - Example: `[Status Output +] --[2kΩ]--[GPIO5]--[3kΩ]--[GND]`
 
 4. **Power**:
 
